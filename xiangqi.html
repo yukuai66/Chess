@@ -1,0 +1,503 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <script type="text/javascript" src="jquery-2.1.4.min.js"></script>
+</head>
+<body>
+  <div class="row">
+    <div class='col-lg-12 canvas-container' style="padding: 0;">
+      <canvas id="Canvas" class='center-block'></canvas>
+    </div>
+  </div>
+  <div class="row">
+    <div class='col-xs-offset-2 col-xs-2' style="padding: 0;">
+      <button type="button" class="btn btn-primary click-back">悔棋</button>
+    </div>
+
+    <div class='col-xs-offset-1 col-xs-7' style="padding: 0;">
+      <h4>棋谱</h4>
+      <div class='list list-container'>
+        
+      </div>
+    </div>
+<!--     <div class='col-xs-offset-2 col-xs-2' style="padding: 0;">
+      <button type="button" class="btn btn-primary">悔棋</button>
+    </div> -->
+  </div>
+<script>
+$(function(){
+  var el = $('#Canvas').get(0);
+  var ctx = el.getContext('2d')
+
+  var Xiangqi = function(el, ctx){
+    this.init(el,ctx);
+  }
+
+  Xiangqi.prototype = {
+    canvasSet : {
+      lineWidth: 2,
+    },
+
+    init: function (el,ctx) {
+      var size = this.suit()
+      this.pieceObj = [];
+      this.el = el;
+      this.el.width = size;
+      this.el.height = size;
+      this.ctx = ctx;
+      this.action = true;
+      this.selectPiece = null;
+      this.record = [];
+      this.pieceDefault = [
+        ['车', '马', '相', '仕', '帅', '仕', '相', '马', '车'],
+        ['', '', '', '', '', '', '', '', '',],
+        ['', '炮', '', '', '', '', '', '炮', ''],
+        ['兵', '', '兵', '', '兵', '', '兵', '', '兵'],
+        ['', '', '', '', '', '', '', '', '',],
+        ['', '', '', '', '', '', '', '', '',],
+        ['卒', '', '卒', '', '卒', '', '卒', '', '卒'],
+        ['', '炮', '', '', '', '', '', '炮', ''],
+        ['', '', '', '', '', '', '', '', '',],
+        ['車', '馬', '象', '士', '将', '士', '象', '馬', '車'],
+      ];
+
+      this.ctx.translate( 40, 40 );
+      this.createCheckerboard();
+      this.drawDefaultChess();
+
+      this.handClick();
+    },
+
+    suit :function(){
+      let width = $(document).width(),
+          height = $(document).height();
+          // count = $(document).width() > 500 ? 100 : 100;
+
+      if( width > height ){
+        var size = height - height%50;
+      }else if ( width === height ) {
+        var size = height - height%50;
+      }else{
+        var size = width - width%50;
+      }
+
+      //align
+      var align = 0.85;
+      this.size = size * align;
+      return size;
+    },
+
+    createCheckerboard: function(){
+      let xCell = 9,
+          yCell = 8,
+          cell = this.size/xCell;
+
+      this.cell = cell;
+
+      this.ctx.lineWidth = this.canvasSet.lineWidth;
+      this.ctx.strokeStyle = '#000'
+      this.ctx.beginPath();
+      //x
+      for( let i = 0; i <= xCell; i++ ){
+        this.ctx.moveTo( 0 , i * cell  )
+        this.ctx.lineTo( this.size-cell , i * cell )
+        this.pieceObj[i] = this.pieceObj[i] || [];
+      }
+
+      //y
+      for( let i = 0; i <= yCell; i++ ){
+        if( i === 0 || i === yCell ){
+          this.ctx.moveTo( i * cell, 0 )
+          this.ctx.lineTo( i * cell, this.size );
+        }else{
+          this.ctx.moveTo( i * cell , 0 )
+          this.ctx.lineTo( i * cell , this.size/2 - cell/2 );
+          this.ctx.moveTo( i * cell , this.size/2 + cell/2 )
+          this.ctx.lineTo( i * cell , this.size ); 
+        }
+        for( let j = 0; j <=yCell; j++ ){
+          this.pieceObj[i][j] = this.pieceObj[i][j] || {};
+        }
+        // this.pieceObj[i] = this.pieceObj[i] || [];
+      }
+
+      //mid
+      this.ctx.font = "bold 30px Arial";
+      this.ctx.textBaseline = "middle";
+      this.ctx.textAlign = "left";
+      this.ctx.fillStyle = "#000";
+      this.ctx.fillText("汉", cell * 1, cell * 4.5);
+      this.ctx.fillText("界", cell * 2, cell * 4.5);
+
+      this.ctx.fillText("楚", cell * 5, cell * 4.5);
+      this.ctx.fillText("河", cell * 6, cell * 4.5);
+
+      this.ctx.stroke();
+
+      //center
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = "#000";
+      this.ctx.lineWidth = 2;
+
+      this.ctx.moveTo( 3 * cell, 0 * cell );
+      this.ctx.lineTo( 5 * cell, 2 * cell );
+
+      this.ctx.moveTo( 5 * cell, 0 * cell );
+      this.ctx.lineTo( 3 * cell, 2 * cell );
+
+      this.ctx.moveTo( 3 * cell , 9 * cell );
+      this.ctx.lineTo( 5 * cell , 7 * cell );
+
+      this.ctx.moveTo( 5 * cell , 9 * cell );
+      this.ctx.lineTo( 3 * cell , 7 * cell );
+
+
+      this.ctx.stroke();
+    },
+
+    drawDefaultChess: function(){
+
+      for( var i = 0; i < this.pieceDefault.length; i++){
+        for( var j = 0; j < this.pieceDefault[i].length; j++){
+          var camp = ( i < 5 ) ? true : false;
+          this.pieceObj[i][j] = new Piece(this.pieceDefault[i][j], j, i, this.cell, this.ctx,  camp);
+        }
+      }
+      this.recordChess();
+    },
+
+    drawChess: function(){
+      this.clearCanvas();
+      this.createCheckerboard();
+      var piece = this.pieceObj;
+      for( var i = 0; i < piece.length; i++){
+        for( var j = 0; j < piece[i].length; j++){
+          this.pieceObj[i][j] = new Piece(piece[i][j].text, j, i, this.cell, this.ctx, piece[i][j].camp);
+        }
+      }
+    },
+
+    handClick: function(){
+      let _this = this;
+      $(el).click(function(e){
+
+        let xy = _this.getPosition(e),
+            x = parseInt(xy.x),
+            y = parseInt(xy.y);
+
+        if( _this.clickCheck( x, y )){
+
+          if( _this.action === _this.pieceObj[y][x].camp ){
+
+            console.log('选中')
+            _this.selectPiece = _this.pieceObj[y][x];
+            _this.drawChess()
+            _this.selectPiece.isSelected();
+
+          }else if( _this.clickCheck( x, y) && _this.selectPiece && _this.selectPiece.camp !=  _this.pieceObj[y][x].camp ){
+
+            console.log("攻击");
+            _this.movePiece(x, y);
+            _this.selectPiece = null;
+
+          }
+        }else if( !_this.clickCheck( x, y) && _this.selectPiece ){
+          console.log("行动");
+          _this.movePiece(x, y);
+          _this.selectPiece = null;
+        }
+      });
+
+      $('.click-back').click(function(){
+        _this.reductionChess()
+      })
+    },
+
+    getPosition: function(e){
+      let x = ( (e.offsetX - 40) / this.cell ).toFixed(0),
+          y = ( (e.offsetY - 40) / this.cell ).toFixed(0);
+      return { x : x, y : y}
+    },
+
+    clickCheck: function(x, y){
+      var bol = this.pieceObj[y][x].text==='' ? false : true;
+      return bol;
+    },
+
+    movePiece: function(x, y){
+      if( !this.moveRule( x, y ) ) {
+        this.drawChess();
+        return false
+      };
+      this.recordChess()
+
+      this.pieceObj[y][x].text = this.selectPiece.text;
+      this.pieceObj[y][x].camp = this.selectPiece.camp;
+
+      this.pieceObj[this.selectPiece.y][this.selectPiece.x].text = '';
+      this.pieceObj[this.selectPiece.y][this.selectPiece.x].camp = null;
+
+      this.action = !this.action;
+      this.drawChess();
+      this.manual( this.selectPiece.text, x, y );
+      
+    },
+
+    recordChess: function(){
+      var obj = $.extend( true, {}, this.pieceObj );
+      var arr = []
+      $.each( obj ,function( i , obj ){
+        arr.push(obj)
+      })
+      this.record.push(arr);
+    },
+
+    moveRule: function(x, y){
+      var type = this.selectPiece.text,
+          move = true,
+          piece = this.selectPiece;
+
+      switch( type ){
+
+        case '车':
+        case '車':
+          if( piece.x - x == 0 &&  piece.y - y != 0 ){
+            let count = (piece.y - y > 0) ? 0 : 1,
+                start = ( piece.y > y ) ? y : piece.y + 1,
+                end = ( piece.y > y ) ? piece.y : y ,
+                camp = piece.camp;
+
+            for( let i = start ; i < end; i ++ ){
+              if( this.pieceObj[i][x].camp != piece.camp && this.pieceObj[i][x].camp != null ){
+                var move = true;
+              }else if( this.pieceObj[i][x].camp != null ) {
+                var move = false;
+              }
+            }
+          }else if( piece.y - y == 0 &&  piece.x - x != 0 ){
+            let count = (piece.x - x > 0) ? 0 : 1,
+                start = ( piece.x > x ) ? x : piece.x + 1,
+                end = ( piece.x > x ) ? piece.x : x ,
+                camp = piece.camp;
+
+            for( let i = start ; i < end; i ++ ){
+              if( this.pieceObj[y][i].camp != piece.camp && this.pieceObj[y][i].camp != null){
+                var move = true;
+              }else if(this.pieceObj[y][i].camp != null ) {
+                var move = false;
+              };
+            }
+          }else if( this.selectPiece.x - x != 0 && this.selectPiece.y - y != 0 ){
+            var move = false;
+          }
+          break;
+
+        case '马':
+        case '馬':
+          if( piece.x - x == 1 && piece.y - y == 2 && this.pieceObj[piece.y - 1][piece.x].text =="" ||piece.x - x == -1 && piece.y - y == 2 && this.pieceObj[piece.y - 1][piece.x].text =="" || piece.x - x == -2 && piece.y - y == 1 && this.pieceObj[piece.y][piece.x + 1].text =="" || piece.x - x == -2 && piece.y - y == -1 && this.pieceObj[piece.y][piece.x + 1].text =="" ||piece.x - x == -1 && piece.y - y == -2 && this.pieceObj[piece.y +1][piece.x].text =="" || piece.x - x == 1 && piece.y - y == -2 && this.pieceObj[piece.y +1][piece.x].text =="" ||  piece.x - x == 2 && piece.y - y == -1 && this.pieceObj[piece.y][piece.x - 1].text =="" || piece.x - x == 2 && piece.y - y == 1 && this.pieceObj[piece.y][piece.x - 1].text ==""){
+            var move = true;
+          }else{
+            var move = false;
+          }
+          break;
+
+        case '相':
+        case '象':
+          if(piece.x - x === 2 && piece.y - y === 2 && this.pieceObj[piece.y - 1][piece.x - 1].text =="" || piece.x - x === -2 && piece.y - y === 2 && this.pieceObj[piece.y - 1][piece.x + 1].text ==""||  piece.x - x === 2 && piece.y - y === -2 && this.pieceObj[piece.y + 1][piece.x - 1].text ==""||  piece.x - x === -2 && piece.y - y === -2 && this.pieceObj[piece.y + 1][piece.x + 1].text =="" ){
+            if( piece.camp && y > 4 ){
+              var move = false;
+            }else if( !piece.camp && y < 5){
+              var move = false;
+            }else{
+              var move = true;
+            }
+          }else{
+            var move = false;
+          }
+          break;
+
+        case '士':
+        case '仕':
+          if( Math.abs(piece.x - x) === 1 && Math.abs(piece.y - y) === 1){
+            if( piece.camp && y > 2 || piece.camp && x < 3 || piece.camp && x > 5 ){
+              var move = false;
+            }else if ( !piece.camp && y < 7 || !piece.camp && x < 3 || !piece.camp && x > 5 ) {
+              var move = false;
+            }else{
+              var move = true;
+            }
+          }else{
+            var move = false;
+          }
+          break;
+
+        case '帅':
+        case '将':
+          if( Math.abs(piece.x - x) === 0 && Math.abs(piece.y - y) === 1 || Math.abs(piece.x - x) === 1 && Math.abs(piece.y - y) === 0 ){
+            if( piece.camp && y > 2 || piece.camp && x < 3 || piece.camp && x > 5 ){
+              var move = false;
+            }else if ( !piece.camp && y < 7 || !piece.camp && x < 3 || !piece.camp && x > 5 ) {
+              var move = false;
+            }else{
+              var move = true;
+            }
+          }else{
+            var move = false;
+          }
+          break;
+
+        case '兵':
+          var move = false;
+          if( y > 4 ){
+            if( Math.abs(piece.x - x) === 0 && Math.abs(piece.y - y) === 1 || Math.abs(piece.x - x) === 1 && Math.abs(piece.y - y) === 0 ){
+              var move = true;
+            }
+          }else if( y <= 4 ){
+            if( piece.y - y === -1){
+              var move = true;
+            }
+          }
+          break;
+        case '卒':
+          var move = false;
+          if( y < 5 ){
+            if( Math.abs(piece.x - x) === 0 && Math.abs(piece.y - y) === 1 || Math.abs(piece.x - x) === 1 && Math.abs(piece.y - y) === 0 ){
+              var move = true;
+            }
+          }else if( y >= 5 ){
+            if( piece.y - y === 1){
+              var move = true;
+            }
+          }
+          break;
+
+        case '炮':
+          if( piece.x - x == 0 &&  piece.y - y != 0 ){
+
+            let start = ( piece.y > y ) ? y : piece.y + 1,
+                end = ( piece.y > y ) ? piece.y : y + 1,
+                camp = piece.camp,
+                count = 0;
+
+            for( let i = start ; i < end; i ++ ){
+              if( this.pieceObj[i][x].camp != null ) count++
+            }
+
+            if( count === 2 && this.pieceObj[y][x].camp != piece.camp ){
+              var move = true;
+            }else if( count === 0 ){
+              var move = true;
+            }else{
+              var move = false;
+            }
+            // console.log(count)
+          }else if( piece.y - y == 0 &&  piece.x - x != 0 ){
+            let start = ( piece.x > x ) ? x : piece.x + 1,
+                end = ( piece.x > x ) ? piece.x : x +1,
+                camp = piece.camp,
+                count = 0;
+
+            for( let i = start ; i < end; i ++ ){
+              if( this.pieceObj[y][i].camp != null ) count++
+            }
+
+            if( count === 2 && this.pieceObj[y][x].camp != piece.camp ){
+              var move = true;
+            }else if( count === 0 ){
+              var move = true;
+            }else{
+              var move = false;
+            }
+          }else if( this.selectPiece.x - x != 0 && this.selectPiece.y - y != 0 ){
+            var move = false;
+          }
+          break;
+        default:
+          return true;
+      }
+
+      return move;
+    },
+
+    manual: function( text, x, y){
+      $('.list-container').append(`<p>${text}[${x} ${y}]</p>`)
+    },
+
+    reductionChess: function(){
+      if( this.record.length === 0) return false;
+      this.pieceObj = this.record.pop()
+      this.drawChess();
+      $('.list-container p:last').remove();
+      this.action = !this.action;
+    },
+
+    clearCanvas: function () {
+      this.ctx.clearRect(-50, -50, this.el.width + 50 , this.el.height + 50);
+    },
+  }
+
+  var Piece = function(text, x, y, r, ctx, camp){
+    this.text = text || '';
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.ctx = ctx;
+    this.camp = text ? camp : null;
+
+    //todo 将规则作为方法单独写入每个棋子 将moveRule方法 改写至此处
+    this.Rule = (function () {
+      if( text === "车" || text === "車" ){
+        return function(){
+          console.log('Rule')
+        }
+      }
+      return function () {
+        console.log('null')
+      };
+    }());
+
+    this.draw();
+  }
+
+  Piece.prototype = {
+
+    draw: function(){
+
+      if( !this.text ) return true;
+
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = this.camp ? "#000" : 'red';
+      this.ctx.arc(this.r * this.x, this.r * this.y, this.r/2, 0, 2 * Math.PI);
+      this.ctx.fillStyle = "#fff";
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = this.camp ? "#000" : 'red';
+      this.ctx.font = "bold 18px Arial";
+      this.ctx.textAlign = "center";
+      this.ctx.textBaseline = "middle";
+      this.ctx.fillText( this.text , this.x*this.r , this.y*this.r );
+    },
+    isSelected: function(){
+      console.log(this)
+      let r = this.r;
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = "#00ff21";
+      this.ctx.lineWidth = 2;
+
+      this.ctx.rect( this.x*r - r/2, this.y*r - r/2, r, r );
+      this.ctx.stroke();
+    }
+  };
+
+  var xiangqi = new Xiangqi(el, ctx);
+
+})
+
+</script>
+</body>
+
+</html>
